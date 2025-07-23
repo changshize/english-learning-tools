@@ -1,0 +1,408 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    min-height: 100vh;
+    padding: 20px;
+}
+
+.container {
+    max-width: 1400px;
+    margin: 0 auto;
+    background: white;
+    border-radius: 15px;
+    box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+    overflow: hidden;
+}
+
+.header {
+    background: linear-gradient(45deg, #4CAF50, #45a049);
+    color: white;
+    padding: 20px;
+    text-align: center;
+}
+
+.header h1 {
+    font-size: 2.5em;
+    margin-bottom: 10px;
+}
+
+.header p {
+    font-size: 1.2em;
+    opacity: 0.9;
+}
+
+.main-content {
+    display: flex;
+    height: calc(100vh - 200px);
+    min-height: 600px;
+}
+
+.video-section {
+    flex: 2;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+}
+
+.video-container {
+    position: relative;
+    flex: 1;
+    background: #000;
+    border-radius: 10px;
+    overflow: hidden;
+    margin-bottom: 20px;
+    min-height: 300px;
+}
+
+#videoPlayer {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+}
+
+.controls {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    margin-bottom: 15px;
+}
+
+.file-input-group {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.file-input {
+    position: relative;
+    overflow: hidden;
+    display: inline-block;
+    background: #4CAF50;
+    color: white;
+    padding: 12px 20px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.3s;
+    font-weight: 500;
+}
+
+.file-input:hover {
+    background: #45a049;
+    transform: translateY(-2px);
+}
+
+.file-input input[type=file] {
+    position: absolute;
+    left: -9999px;
+}
+
+.speed-control {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.speed-btn {
+    background: #2196F3;
+    color: white;
+    border: none;
+    padding: 8px 15px;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 0.9em;
+    transition: all 0.3s;
+}
+
+.speed-btn:hover {
+    background: #1976D2;
+}
+
+.speed-btn.active {
+    background: #1976D2;
+    transform: scale(1.1);
+}
+
+.control-buttons {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.btn {
+    background: #4CAF50;
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 1em;
+    transition: all 0.3s;
+    font-weight: 500;
+}
+
+.btn:hover {
+    background: #45a049;
+    transform: translateY(-2px);
+}
+
+.btn:disabled {
+    background: #ccc;
+    cursor: not-allowed;
+    transform: none;
+}
+
+.btn-small {
+    background: #FF9800;
+    color: white;
+    border: none;
+    padding: 5px 10px;
+    border-radius: 3px;
+    cursor: pointer;
+    font-size: 0.8em;
+    transition: all 0.3s;
+}
+
+.btn-small:hover {
+    background: #F57C00;
+}
+
+.progress-container {
+    margin-top: 10px;
+}
+
+.progress-bar {
+    height: 8px;
+    background: #ddd;
+    border-radius: 4px;
+    overflow: hidden;
+    cursor: pointer;
+    margin-bottom: 5px;
+}
+
+.progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #4CAF50, #45a049);
+    width: 0%;
+    transition: width 0.1s;
+}
+
+.time-display {
+    text-align: center;
+    font-size: 0.9em;
+    color: #666;
+}
+
+.subtitle-section {
+    flex: 1;
+    border-left: 2px solid #eee;
+    display: flex;
+    flex-direction: column;
+    min-width: 350px;
+}
+
+.subtitle-header {
+    background: #f8f9fa;
+    padding: 15px;
+    border-bottom: 1px solid #eee;
+}
+
+.subtitle-header h3 {
+    margin-bottom: 5px;
+}
+
+.subtitle-header p {
+    font-size: 0.9em;
+    color: #666;
+    margin-bottom: 10px;
+}
+
+.subtitle-controls {
+    display: flex;
+    gap: 5px;
+}
+
+.subtitle-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 10px;
+}
+
+.placeholder {
+    text-align: center;
+    padding: 50px 20px;
+    color: #666;
+}
+
+.placeholder-icon {
+    font-size: 4em;
+    margin-bottom: 20px;
+}
+
+.placeholder h3 {
+    margin-bottom: 10px;
+    color: #333;
+}
+
+.features {
+    margin-top: 30px;
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+.feature {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    justify-content: center;
+}
+
+.feature-icon {
+    font-size: 1.5em;
+}
+
+.subtitle-item {
+    padding: 15px;
+    margin: 8px 0;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    border-left: 4px solid transparent;
+    background: #f9f9f9;
+}
+
+.subtitle-item:hover {
+    background: #e3f2fd;
+    border-left-color: #2196F3;
+    transform: translateX(5px);
+}
+
+.subtitle-item.active {
+    background: linear-gradient(135deg, #4CAF50, #45a049);
+    color: white;
+    border-left-color: #2E7D32;
+    transform: translateX(8px);
+    box-shadow: 0 5px 15px rgba(76, 175, 80, 0.3);
+}
+
+.subtitle-time {
+    font-size: 0.85em;
+    color: #666;
+    margin-bottom: 8px;
+    font-weight: 500;
+}
+
+.subtitle-item.active .subtitle-time {
+    color: #E8F5E8;
+}
+
+.subtitle-text {
+    font-size: 1.1em;
+    line-height: 1.5;
+    font-weight: 400;
+}
+
+.subtitle-item.active .subtitle-text {
+    font-weight: 500;
+}
+
+.current-subtitle {
+    position: fixed;
+    bottom: 30px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0,0,0,0.9);
+    color: white;
+    padding: 20px 30px;
+    border-radius: 30px;
+    font-size: 1.3em;
+    max-width: 80%;
+    text-align: center;
+    z-index: 1000;
+    display: none;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+    backdrop-filter: blur(10px);
+}
+
+.floating-controls {
+    position: fixed;
+    top: 50%;
+    right: 20px;
+    transform: translateY(-50%);
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    z-index: 1000;
+}
+
+.float-btn {
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    border: none;
+    background: rgba(76, 175, 80, 0.9);
+    color: white;
+    font-size: 1.2em;
+    cursor: pointer;
+    transition: all 0.3s;
+    backdrop-filter: blur(10px);
+}
+
+.float-btn:hover {
+    background: rgba(76, 175, 80, 1);
+    transform: scale(1.1);
+}
+
+.file-info {
+    margin-top: 15px;
+    padding: 15px;
+    background: #f0f0f0;
+    border-radius: 8px;
+    font-size: 0.9em;
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+    .main-content {
+        flex-direction: column;
+        height: auto;
+    }
+    
+    .subtitle-section {
+        border-left: none;
+        border-top: 2px solid #eee;
+        max-height: 400px;
+        min-width: auto;
+    }
+    
+    .file-input-group {
+        flex-direction: column;
+    }
+    
+    .control-buttons {
+        flex-direction: column;
+    }
+    
+    .floating-controls {
+        position: relative;
+        top: auto;
+        right: auto;
+        transform: none;
+        flex-direction: row;
+        justify-content: center;
+        margin: 20px 0;
+    }
+    
+    .current-subtitle {
+        bottom: 10px;
+        font-size: 1.1em;
+        padding: 15px 20px;
+    }
+}

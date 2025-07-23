@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>英语学习视频播放器 - 影子跟读</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎬 英语学习视频播放器</h1>
+            <p>支持字幕显示和影子跟读功能</p>
+        </div>
+
+        <div class="main-content">
+            <div class="video-section">
+                <div class="video-container">
+                    <video id="videoPlayer" controls>
+                        <p>您的浏览器不支持视频播放。</p>
+                    </video>
+                </div>
+
+                <div class="controls">
+                    <div class="file-input-group">
+                        <label class="file-input">
+                            <input type="file" id="videoFile" accept="video/*">
+                            📹 选择视频文件
+                        </label>
+                        <label class="file-input">
+                            <input type="file" id="subtitleFile" accept=".vtt,.srt">
+                            📝 选择字幕文件
+                        </label>
+                    </div>
+
+                    <div class="speed-control">
+                        <span>播放速度:</span>
+                        <button class="speed-btn" data-speed="0.5">0.5x</button>
+                        <button class="speed-btn" data-speed="0.75">0.75x</button>
+                        <button class="speed-btn active" data-speed="1">1x</button>
+                        <button class="speed-btn" data-speed="1.25">1.25x</button>
+                        <button class="speed-btn" data-speed="1.5">1.5x</button>
+                    </div>
+
+                    <div class="control-buttons">
+                        <button class="btn" id="toggleSubtitle">显示字幕</button>
+                        <button class="btn" id="repeatBtn" disabled>🔄 重复当前句子</button>
+                        <button class="btn" id="prevBtn" disabled>⏮️ 上一句</button>
+                        <button class="btn" id="nextBtn" disabled>⏭️ 下一句</button>
+                    </div>
+                </div>
+
+                <div class="progress-container">
+                    <div class="progress-bar" id="progressBar">
+                        <div class="progress-fill" id="progressFill"></div>
+                    </div>
+                    <div class="time-display">
+                        <span id="currentTime">00:00</span> / <span id="totalTime">00:00</span>
+                    </div>
+                </div>
+
+                <div class="file-info" id="fileInfo" style="display: none;">
+                    <div id="videoInfo"></div>
+                    <div id="subtitleInfo"></div>
+                </div>
+            </div>
+
+            <div class="subtitle-section">
+                <div class="subtitle-header">
+                    <h3>📝 字幕列表</h3>
+                    <p>点击任意字幕跳转到对应时间，支持影子跟读</p>
+                    <div class="subtitle-controls">
+                        <button class="btn-small" id="autoScrollBtn">自动滚动</button>
+                        <button class="btn-small" id="clearHighlightBtn">清除高亮</button>
+                    </div>
+                </div>
+                <div class="subtitle-list" id="subtitleList">
+                    <div class="placeholder">
+                        <div class="placeholder-icon">🎬</div>
+                        <h3>欢迎使用英语学习播放器</h3>
+                        <p>请先加载视频和字幕文件开始学习</p>
+                        <div class="features">
+                            <div class="feature">
+                                <span class="feature-icon">🎯</span>
+                                <span>点击字幕跳转</span>
+                            </div>
+                            <div class="feature">
+                                <span class="feature-icon">🔄</span>
+                                <span>重复播放</span>
+                            </div>
+                            <div class="feature">
+                                <span class="feature-icon">📖</span>
+                                <span>影子跟读</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="current-subtitle" id="currentSubtitle"></div>
+        
+        <div class="floating-controls" id="floatingControls" style="display: none;">
+            <button class="float-btn" id="floatRepeat" title="重复当前句子">🔄</button>
+            <button class="float-btn" id="floatPrev" title="上一句">⏮️</button>
+            <button class="float-btn" id="floatNext" title="下一句">⏭️</button>
+            <button class="float-btn" id="floatToggle" title="显示/隐藏字幕">👁️</button>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
