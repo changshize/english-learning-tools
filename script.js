@@ -5,6 +5,7 @@ class VideoPlayer {
         this.currentSubtitleIndex = -1;
         this.isSubtitleVisible = false;
         this.autoScroll = true;
+        // 移除分句功能，改用AI生成字幕
         
         this.initializeElements();
         this.bindEvents();
@@ -30,6 +31,12 @@ class VideoPlayer {
         this.nextBtn = document.getElementById('nextBtn');
         this.autoScrollBtn = document.getElementById('autoScrollBtn');
         this.clearHighlightBtn = document.getElementById('clearHighlightBtn');
+        this.generateSubtitleBtn = document.getElementById('generateSubtitleBtn');
+
+        // AI进度显示元素
+        this.aiProgress = document.getElementById('aiProgress');
+        this.progressText = document.getElementById('progressText');
+        this.progressBarFill = document.getElementById('progressBarFill');
         
         // 浮动控制按钮
         this.floatingControls = document.getElementById('floatingControls');
@@ -55,6 +62,7 @@ class VideoPlayer {
         this.nextBtn.addEventListener('click', () => this.goToNextSubtitle());
         this.autoScrollBtn.addEventListener('click', () => this.toggleAutoScroll());
         this.clearHighlightBtn.addEventListener('click', () => this.clearHighlight());
+        this.generateSubtitleBtn.addEventListener('click', () => this.generateSubtitlesWithAI());
         
         // 浮动控制按钮事件
         this.floatRepeat.addEventListener('click', () => this.repeatCurrentSubtitle());
@@ -139,6 +147,8 @@ class VideoPlayer {
             // 解析SRT格式
             this.parseSRT(content);
         }
+
+        // 分句功能已移除，直接使用解析后的字幕
 
         this.renderSubtitleList();
         console.log('字幕解析完成:', this.subtitles.length, '条');
@@ -291,6 +301,283 @@ class VideoPlayer {
             return 0;
         }
     }
+
+    // AI字幕生成功能 - 使用Python后端
+    async generateSubtitlesWithAI() {
+        if (!this.video.src) {
+            alert('请先加载视频文件');
+            return;
+        }
+
+        try {
+            this.showProgress('正在检查Whisper服务...', 10);
+            this.generateSubtitleBtn.disabled = true;
+            this.generateSubtitleBtn.textContent = '🤖 正在生成字幕...';
+
+            console.log('开始Python Whisper字幕生成...');
+
+            // 检查后端服务
+            await this.checkWhisperService();
+            this.updateProgress('正在提取音频...', 30);
+
+            // 提取音频数据
+            const audioBlob = await this.extractAudioBlob();
+            this.updateProgress('正在发送到Whisper服务...', 50);
+
+            // 发送到Python后端转录
+            const result = await this.callWhisperAPI(audioBlob);
+            this.updateProgress('正在处理字幕...', 80);
+
+            // 转换为字幕格式
+            this.subtitles = this.processWhisperAPIResult(result);
+            this.renderSubtitleList();
+            this.enableSubtitleControls();
+
+            this.subtitleInfo.textContent = `Python Whisper生成字幕: ${this.subtitles.length} 条字幕`;
+            this.fileInfo.style.display = 'block';
+
+            this.updateProgress('✅ Whisper字幕生成完成！', 100);
+            console.log('Python Whisper字幕生成完成:', this.subtitles.length, '条字幕');
+
+            setTimeout(() => this.hideProgress(), 2000);
+
+        } catch (error) {
+            console.error('Python Whisper字幕生成失败:', error);
+            this.updateProgress('❌ 生成失败: ' + error.message, 0);
+            setTimeout(() => this.hideProgress(), 5000);
+        } finally {
+            this.generateSubtitleBtn.disabled = false;
+            this.generateSubtitleBtn.textContent = '🤖 AI生成字幕';
+        }
+    }
+
+    // 显示进度
+    showProgress(text, percentage) {
+        this.aiProgress.style.display = 'block';
+        this.progressText.textContent = text;
+        this.progressBarFill.style.width = percentage + '%';
+    }
+
+    // 更新进度
+    updateProgress(text, percentage) {
+        this.progressText.textContent = text;
+        this.progressBarFill.style.width = percentage + '%';
+    }
+
+    // 隐藏进度
+    hideProgress() {
+        this.aiProgress.style.display = 'none';
+    }
+
+    // 检查Whisper后端服务
+    async checkWhisperService() {
+        console.log('检查Whisper后端服务...');
+
+        try {
+            const response = await fetch('http://localhost:5000/health');
+            if (!response.ok) {
+                throw new Error(`服务响应错误: ${response.status}`);
+            }
+
+            const data = await response.json();
+            console.log('Whisper服务状态:', data);
+
+            if (!data.model_loaded) {
+                throw new Error('Whisper模型未加载');
+            }
+
+            console.log('✅ Whisper服务正常');
+        } catch (error) {
+            console.error('Whisper服务检查失败:', error);
+            throw new Error('无法连接到Whisper服务，请确保Python服务器正在运行 (端口5000)');
+        }
+    }
+
+    // 提取音频为Blob格式
+    async extractAudioBlob() {
+        console.log('提取音频为Blob格式...');
+
+        try {
+            if (this.video.src.startsWith('blob:')) {
+                // 直接从blob URL获取
+                const response = await fetch(this.video.src);
+                const videoBlob = await response.arrayBuffer();
+
+                // 使用Web Audio API提取音频
+                const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                const audioBuffer = await audioContext.decodeAudioData(videoBlob);
+
+                // 转换为WAV格式
+                const wavBlob = this.audioBufferToWav(audioBuffer);
+                console.log('音频Blob创建成功，大小:', wavBlob.size, 'bytes');
+
+                return wavBlob;
+            } else {
+                throw new Error('不支持的视频源格式');
+            }
+        } catch (error) {
+            console.error('音频提取失败:', error);
+            throw new Error('音频提取失败: ' + error.message);
+        }
+    }
+
+    // 调用Python Whisper API
+    async callWhisperAPI(audioBlob) {
+        console.log('调用Python Whisper API...');
+        console.log('音频文件大小:', audioBlob.size, 'bytes');
+
+        try {
+            const formData = new FormData();
+            formData.append('audio', audioBlob, 'audio.wav');
+            formData.append('language', 'en');
+            formData.append('task', 'transcribe');
+
+            console.log('发送请求到Whisper服务...');
+            const response = await fetch('http://localhost:5000/transcribe', {
+                method: 'POST',
+                body: formData
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.error || `HTTP ${response.status}`);
+            }
+
+            const data = await response.json();
+            console.log('Whisper API响应:', data);
+
+            if (!data.success) {
+                throw new Error(data.error || 'API调用失败');
+            }
+
+            return data.result;
+
+        } catch (error) {
+            console.error('Whisper API调用失败:', error);
+            throw new Error('API调用失败: ' + error.message);
+        }
+    }
+
+    // 将AudioBuffer转换为WAV格式
+    audioBufferToWav(audioBuffer) {
+        const length = audioBuffer.length;
+        const sampleRate = audioBuffer.sampleRate;
+        const numberOfChannels = audioBuffer.numberOfChannels;
+
+        // 创建WAV文件头
+        const buffer = new ArrayBuffer(44 + length * numberOfChannels * 2);
+        const view = new DataView(buffer);
+
+        // WAV文件头
+        const writeString = (offset, string) => {
+            for (let i = 0; i < string.length; i++) {
+                view.setUint8(offset + i, string.charCodeAt(i));
+            }
+        };
+
+        writeString(0, 'RIFF');
+        view.setUint32(4, 36 + length * numberOfChannels * 2, true);
+        writeString(8, 'WAVE');
+        writeString(12, 'fmt ');
+        view.setUint32(16, 16, true);
+        view.setUint16(20, 1, true);
+        view.setUint16(22, numberOfChannels, true);
+        view.setUint32(24, sampleRate, true);
+        view.setUint32(28, sampleRate * numberOfChannels * 2, true);
+        view.setUint16(32, numberOfChannels * 2, true);
+        view.setUint16(34, 16, true);
+        writeString(36, 'data');
+        view.setUint32(40, length * numberOfChannels * 2, true);
+
+        // 写入音频数据
+        let offset = 44;
+        for (let i = 0; i < length; i++) {
+            for (let channel = 0; channel < numberOfChannels; channel++) {
+                const sample = Math.max(-1, Math.min(1, audioBuffer.getChannelData(channel)[i]));
+                view.setInt16(offset, sample * 0x7FFF, true);
+                offset += 2;
+            }
+        }
+
+        return new Blob([buffer], { type: 'audio/wav' });
+    }
+
+
+
+    // 处理Python Whisper API结果
+    processWhisperAPIResult(result) {
+        console.log('处理Python Whisper API结果:');
+        console.log('- result:', result);
+        console.log('- result.text:', result?.text);
+        console.log('- result.segments:', result?.segments);
+
+        if (!result) {
+            throw new Error('API返回null结果');
+        }
+
+        const subtitles = [];
+
+        // 检查是否有segments（Python Whisper的标准格式）
+        if (result.segments && Array.isArray(result.segments) && result.segments.length > 0) {
+            console.log('使用segments数据，数量:', result.segments.length);
+
+            result.segments.forEach((segment, index) => {
+                console.log(`Segment ${index}:`, segment);
+
+                if (segment.text && segment.text.trim()) {
+                    subtitles.push({
+                        start: segment.start || index * 3,
+                        end: segment.end || (index + 1) * 3,
+                        text: segment.text.trim()
+                    });
+                }
+            });
+        }
+        // 如果只有文本，按句子分割
+        else if (result.text && result.text.trim().length > 0) {
+            console.log('使用text数据:', result.text);
+
+            const sentences = result.text.split(/[.!?]+/).filter(s => s.trim());
+            const duration = this.video.duration || 60;
+            const segmentDuration = duration / sentences.length;
+
+            sentences.forEach((sentence, index) => {
+                subtitles.push({
+                    start: index * segmentDuration,
+                    end: (index + 1) * segmentDuration,
+                    text: sentence.trim()
+                });
+            });
+        }
+        else {
+            console.error('API结果既没有segments也没有text');
+            throw new Error('API返回空结果 - 没有可用的文本或segments数据');
+        }
+
+        console.log('处理后的字幕数量:', subtitles.length);
+
+        if (subtitles.length === 0) {
+            throw new Error('处理后字幕数量为0');
+        }
+
+        return subtitles;
+    }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
     renderSubtitleList() {
         this.subtitleList.innerHTML = '';
@@ -447,6 +734,8 @@ class VideoPlayer {
         this.autoScrollBtn.textContent = this.autoScroll ? '关闭自动滚动' : '开启自动滚动';
         this.autoScrollBtn.style.background = this.autoScroll ? '#4CAF50' : '#FF9800';
     }
+
+
 
     clearHighlight() {
         document.querySelectorAll('.subtitle-item.active').forEach(item => {

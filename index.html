@@ -3,8 +3,16 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>英语学习视频播放器 - 影子跟读</title>
+    <title>英语学习视频播放器 - AI字幕生成</title>
     <link rel="stylesheet" href="style.css">
+    <!-- Transformers.js for AI subtitle generation -->
+    <script type="module">
+        import { pipeline, env } from 'https://cdn.jsdelivr.net/npm/@xenova/transformers@2.17.2';
+        // 设置为本地模式，避免网络依赖
+        env.allowLocalModels = false;
+        env.allowRemoteModels = true;
+        window.transformers = { pipeline, env };
+    </script>
 </head>
 <body>
     <div class="container">
@@ -47,6 +55,7 @@
                         <button class="btn" id="repeatBtn" disabled>🔄 重复当前句子</button>
                         <button class="btn" id="prevBtn" disabled>⏮️ 上一句</button>
                         <button class="btn" id="nextBtn" disabled>⏭️ 下一句</button>
+                        <button class="btn" id="generateSubtitleBtn" style="background: #2196F3;">🤖 AI生成字幕</button>
                     </div>
                 </div>
 
@@ -62,6 +71,24 @@
                 <div class="file-info" id="fileInfo" style="display: none;">
                     <div id="videoInfo"></div>
                     <div id="subtitleInfo"></div>
+                </div>
+
+                <div class="ai-progress" id="aiProgress" style="display: none;">
+                    <div class="progress-text" id="progressText">正在初始化AI模型...</div>
+                    <div class="progress-bar-container">
+                        <div class="progress-bar-fill" id="progressBarFill"></div>
+                    </div>
+                </div>
+
+                <div class="ai-info" style="background: #e8f5e8; border: 1px solid #4CAF50; border-radius: 8px; padding: 15px; margin: 10px 0; font-size: 14px;">
+                    <h4 style="margin: 0 0 10px 0; color: #2E7D32;">🐍 Python Whisper字幕生成说明</h4>
+                    <ul style="margin: 0; padding-left: 20px; color: #555;">
+                        <li><strong>需要启动Python服务</strong>：双击 <code>start_server.bat</code> 启动后端服务</li>
+                        <li><strong>首次使用</strong>：会自动安装依赖包和下载Whisper模型</li>
+                        <li><strong>高质量转录</strong>：使用完整版Whisper，准确度更高</li>
+                        <li><strong>支持长视频</strong>：自动分块处理，无时长限制</li>
+                        <li><strong>服务地址</strong>：<a href="http://localhost:5000/health" target="_blank">http://localhost:5000</a></li>
+                    </ul>
                 </div>
             </div>
 
