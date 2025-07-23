@@ -2,9 +2,12 @@ class VideoPlayer {
     constructor() {
         this.video = document.getElementById('videoPlayer');
         this.subtitles = [];
+        this.sentences = []; // 分句后的句子数组
         this.currentSubtitleIndex = -1;
         this.isSubtitleVisible = false;
         this.autoScroll = true;
+        this.sentenceMode = false; // 分句模式开关
+        this.currentFileName = ''; // 当前字幕文件名
         
         this.initializeElements();
         this.bindEvents();
@@ -25,6 +28,7 @@ class VideoPlayer {
         
         // 控制按钮
         this.toggleSubtitleBtn = document.getElementById('toggleSubtitle');
+        this.sentenceModeBtn = document.getElementById('sentenceModeBtn');
         this.repeatBtn = document.getElementById('repeatBtn');
         this.prevBtn = document.getElementById('prevBtn');
         this.nextBtn = document.getElementById('nextBtn');
@@ -50,6 +54,7 @@ class VideoPlayer {
         
         // 控制按钮事件
         this.toggleSubtitleBtn.addEventListener('click', () => this.toggleSubtitleDisplay());
+        this.sentenceModeBtn.addEventListener('click', () => this.toggleSentenceMode());
         this.repeatBtn.addEventListener('click', () => this.repeatCurrentSubtitle());
         this.prevBtn.addEventListener('click', () => this.goToPreviousSubtitle());
         this.nextBtn.addEventListener('click', () => this.goToNextSubtitle());
@@ -108,7 +113,7 @@ class VideoPlayer {
                 }
 
                 this.parseSubtitle(content);
-                this.subtitleInfo.textContent = `字幕: ${file.name} (${this.subtitles.length} 条字幕)`;
+                this.updateSubtitleInfo(file.name);
                 this.fileInfo.style.display = 'block';
 
                 if (this.subtitles.length === 0) {
@@ -140,6 +145,7 @@ class VideoPlayer {
             this.parseSRT(content);
         }
 
+        this.generateSentences();
         this.renderSubtitleList();
         console.log('字幕解析完成:', this.subtitles.length, '条');
     }
@@ -292,22 +298,125 @@ class VideoPlayer {
         }
     }
 
+    generateSentences() {
+        this.sentences = [];
+
+        this.subtitles.forEach((subtitle, subtitleIndex) => {
+            const sentences = this.splitIntoSentences(subtitle.text);
+            const duration = subtitle.end - subtitle.start;
+            const avgSentenceLength = subtitle.text.length / sentences.length;
+
+            let currentTime = subtitle.start;
+
+            sentences.forEach((sentence, sentenceIndex) => {
+                if (sentence.trim()) {
+                    // 根据句子长度分配时间
+                    const sentenceLength = sentence.length;
+                    const timeRatio = sentenceLength / subtitle.text.length;
+                    const sentenceDuration = duration * timeRatio;
+
+                    const sentenceStart = currentTime;
+                    const sentenceEnd = Math.min(currentTime + sentenceDuration, subtitle.end);
+
+                    this.sentences.push({
+                        start: sentenceStart,
+                        end: sentenceEnd,
+                        text: sentence.trim(),
+                        originalIndex: subtitleIndex,
+                        sentenceIndex: sentenceIndex,
+                        isSentence: true
+                    });
+
+                    currentTime = sentenceEnd;
+                }
+            });
+        });
+
+        console.log('分句完成:', this.sentences.length, '个句子');
+    }
+
+    splitIntoSentences(text) {
+        // 清理文本
+        text = text.replace(/\s+/g, ' ').trim();
+
+        // 改进的句子分割算法
+        // 先按标点符号分割，然后合并过短的片段
+        const punctuationRegex = /([.!?]+)/g;
+        const parts = text.split(punctuationRegex);
+
+        let sentences = [];
+        let currentSentence = '';
+
+        for (let i = 0; i < parts.length; i++) {
+            const part = parts[i].trim();
+            if (!part) continue;
+
+            if (punctuationRegex.test(part)) {
+                // 这是标点符号
+                currentSentence += part;
+                // 如果当前句子有足够的内容，就结束这个句子
+                if (currentSentence.trim().length > 0) {
+                    sentences.push(currentSentence.trim());
+                    currentSentence = '';
+                }
+            } else {
+                // 这是文本内容
+                currentSentence += (currentSentence ? ' ' : '') + part;
+            }
+        }
+
+        // 添加剩余的文本
+        if (currentSentence.trim()) {
+            sentences.push(currentSentence.trim());
+        }
+
+        // 如果没有找到句子分割点，返回原文本
+        if (sentences.length === 0) {
+            sentences.push(text);
+        }
+
+        // 过滤掉过短的句子（少于3个字符）
+        sentences = sentences.filter(s => s.length >= 3);
+
+        return sentences;
+    }
+
     renderSubtitleList() {
         this.subtitleList.innerHTML = '';
-        
-        this.subtitles.forEach((subtitle, index) => {
-            const item = document.createElement('div');
-            item.className = 'subtitle-item';
-            item.dataset.index = index;
-            
-            item.innerHTML = `
-                <div class="subtitle-time">${this.formatTime(subtitle.start)} - ${this.formatTime(subtitle.end)}</div>
-                <div class="subtitle-text">${subtitle.text}</div>
-            `;
-            
-            item.addEventListener('click', () => this.jumpToSubtitle(index));
-            this.subtitleList.appendChild(item);
-        });
+
+        if (this.sentenceMode && this.sentences.length > 0) {
+            // 分句模式：显示句子
+            this.sentences.forEach((sentence, index) => {
+                const item = document.createElement('div');
+                item.className = 'subtitle-item sentence';
+                item.dataset.index = index;
+                item.dataset.type = 'sentence';
+
+                item.innerHTML = `
+                    <div class="subtitle-time">${this.formatTime(sentence.start)} - ${this.formatTime(sentence.end)}</div>
+                    <div class="subtitle-text">${sentence.text}</div>
+                `;
+
+                item.addEventListener('click', () => this.jumpToItem(index, 'sentence'));
+                this.subtitleList.appendChild(item);
+            });
+        } else {
+            // 普通模式：显示原始字幕
+            this.subtitles.forEach((subtitle, index) => {
+                const item = document.createElement('div');
+                item.className = 'subtitle-item';
+                item.dataset.index = index;
+                item.dataset.type = 'subtitle';
+
+                item.innerHTML = `
+                    <div class="subtitle-time">${this.formatTime(subtitle.start)} - ${this.formatTime(subtitle.end)}</div>
+                    <div class="subtitle-text">${subtitle.text}</div>
+                `;
+
+                item.addEventListener('click', () => this.jumpToItem(index, 'subtitle'));
+                this.subtitleList.appendChild(item);
+            });
+        }
     }
 
     updateProgress() {
@@ -330,37 +439,51 @@ class VideoPlayer {
 
     updateCurrentSubtitle(currentTime) {
         let newIndex = -1;
-        
-        for (let i = 0; i < this.subtitles.length; i++) {
-            if (currentTime >= this.subtitles[i].start && currentTime <= this.subtitles[i].end) {
-                newIndex = i;
-                break;
+        let currentText = '';
+
+        if (this.sentenceMode && this.sentences.length > 0) {
+            // 分句模式：查找当前句子
+            for (let i = 0; i < this.sentences.length; i++) {
+                if (currentTime >= this.sentences[i].start && currentTime <= this.sentences[i].end) {
+                    newIndex = i;
+                    currentText = this.sentences[i].text;
+                    break;
+                }
+            }
+        } else {
+            // 普通模式：查找当前字幕
+            for (let i = 0; i < this.subtitles.length; i++) {
+                if (currentTime >= this.subtitles[i].start && currentTime <= this.subtitles[i].end) {
+                    newIndex = i;
+                    currentText = this.subtitles[i].text;
+                    break;
+                }
             }
         }
-        
+
         if (newIndex !== this.currentSubtitleIndex) {
             // 移除之前的高亮
             if (this.currentSubtitleIndex >= 0) {
                 const prevItem = this.subtitleList.children[this.currentSubtitleIndex];
                 if (prevItem) prevItem.classList.remove('active');
             }
-            
+
             this.currentSubtitleIndex = newIndex;
-            
+
             if (newIndex >= 0) {
                 const currentItem = this.subtitleList.children[newIndex];
                 if (currentItem) {
                     currentItem.classList.add('active');
-                    
+
                     // 自动滚动到当前字幕
                     if (this.autoScroll) {
                         currentItem.scrollIntoView({ behavior: 'smooth', block: 'center' });
                     }
                 }
-                
+
                 // 显示当前字幕
                 if (this.isSubtitleVisible) {
-                    this.currentSubtitle.textContent = this.subtitles[newIndex].text;
+                    this.currentSubtitle.textContent = currentText;
                     this.currentSubtitle.style.display = 'block';
                 }
             } else {
@@ -381,6 +504,51 @@ class VideoPlayer {
             this.updateSubtitleHighlight(index);
 
             console.log(`跳转到字幕 ${index + 1}/${this.subtitles.length}: ${subtitle.text}`);
+        }
+    }
+
+    jumpToItem(index, type) {
+        if (type === 'sentence' && index >= 0 && index < this.sentences.length) {
+            const sentence = this.sentences[index];
+            this.video.currentTime = sentence.start;
+            this.currentSubtitleIndex = index;
+            this.updateItemHighlight(index, 'sentence');
+            console.log(`跳转到句子 ${index + 1}/${this.sentences.length}: ${sentence.text}`);
+        } else if (type === 'subtitle' && index >= 0 && index < this.subtitles.length) {
+            this.jumpToSubtitle(index);
+        }
+    }
+
+    toggleSentenceMode() {
+        this.sentenceMode = !this.sentenceMode;
+        this.sentenceModeBtn.textContent = this.sentenceMode ? '📝 退出分句' : '📝 分句模式';
+        this.sentenceModeBtn.classList.toggle('active', this.sentenceMode);
+
+        // 重新渲染字幕列表
+        this.renderSubtitleList();
+
+        // 清除当前高亮
+        this.currentSubtitleIndex = -1;
+        this.currentSubtitle.style.display = 'none';
+
+        console.log('分句模式:', this.sentenceMode ? '开启' : '关闭');
+
+        // 更新字幕信息显示
+        this.updateSubtitleInfo();
+    }
+
+    updateSubtitleInfo(fileName = '') {
+        if (fileName) {
+            this.currentFileName = fileName;
+        }
+
+        const subtitleCount = this.subtitles.length;
+        const sentenceCount = this.sentences.length;
+
+        if (this.sentenceMode && sentenceCount > 0) {
+            this.subtitleInfo.textContent = `字幕: ${this.currentFileName || '已加载'} (${subtitleCount} 条字幕, ${sentenceCount} 个句子)`;
+        } else {
+            this.subtitleInfo.textContent = `字幕: ${this.currentFileName || '已加载'} (${subtitleCount} 条字幕)`;
         }
     }
 
@@ -408,31 +576,93 @@ class VideoPlayer {
         }
     }
 
+    updateItemHighlight(index, type) {
+        // 移除所有高亮
+        document.querySelectorAll('.subtitle-item.active').forEach(item => {
+            item.classList.remove('active');
+        });
+
+        // 添加新的高亮
+        if (index >= 0 && index < this.subtitleList.children.length) {
+            const currentItem = this.subtitleList.children[index];
+            currentItem.classList.add('active');
+
+            // 滚动到当前项
+            if (this.autoScroll) {
+                currentItem.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+
+            // 显示当前内容
+            if (this.isSubtitleVisible) {
+                let text = '';
+                if (type === 'sentence' && this.sentences[index]) {
+                    text = this.sentences[index].text;
+                } else if (type === 'subtitle' && this.subtitles[index]) {
+                    text = this.subtitles[index].text;
+                }
+
+                if (text) {
+                    this.currentSubtitle.textContent = text;
+                    this.currentSubtitle.style.display = 'block';
+                }
+            }
+        }
+    }
+
     repeatCurrentSubtitle() {
         if (this.currentSubtitleIndex >= 0) {
-            const subtitle = this.subtitles[this.currentSubtitleIndex];
-            this.video.currentTime = subtitle.start;
+            if (this.sentenceMode && this.sentences.length > 0) {
+                const sentence = this.sentences[this.currentSubtitleIndex];
+                this.video.currentTime = sentence.start;
+            } else {
+                const subtitle = this.subtitles[this.currentSubtitleIndex];
+                this.video.currentTime = subtitle.start;
+            }
             this.video.play();
-        } else if (this.subtitles.length > 0) {
-            // 如果没有当前字幕，播放第一句
-            this.jumpToSubtitle(0);
+        } else {
+            // 如果没有当前项，播放第一项
+            if (this.sentenceMode && this.sentences.length > 0) {
+                this.jumpToItem(0, 'sentence');
+            } else if (this.subtitles.length > 0) {
+                this.jumpToSubtitle(0);
+            }
             this.video.play();
         }
     }
 
     goToPreviousSubtitle() {
         if (this.currentSubtitleIndex > 0) {
-            this.jumpToSubtitle(this.currentSubtitleIndex - 1);
-        } else if (this.subtitles.length > 0) {
-            this.jumpToSubtitle(0);
+            if (this.sentenceMode && this.sentences.length > 0) {
+                this.jumpToItem(this.currentSubtitleIndex - 1, 'sentence');
+            } else {
+                this.jumpToSubtitle(this.currentSubtitleIndex - 1);
+            }
+        } else {
+            // 跳到第一项
+            if (this.sentenceMode && this.sentences.length > 0) {
+                this.jumpToItem(0, 'sentence');
+            } else if (this.subtitles.length > 0) {
+                this.jumpToSubtitle(0);
+            }
         }
     }
 
     goToNextSubtitle() {
-        if (this.currentSubtitleIndex < this.subtitles.length - 1) {
-            this.jumpToSubtitle(this.currentSubtitleIndex + 1);
-        } else if (this.currentSubtitleIndex === -1 && this.subtitles.length > 0) {
-            this.jumpToSubtitle(0);
+        const maxIndex = this.sentenceMode ? this.sentences.length - 1 : this.subtitles.length - 1;
+
+        if (this.currentSubtitleIndex < maxIndex) {
+            if (this.sentenceMode && this.sentences.length > 0) {
+                this.jumpToItem(this.currentSubtitleIndex + 1, 'sentence');
+            } else {
+                this.jumpToSubtitle(this.currentSubtitleIndex + 1);
+            }
+        } else if (this.currentSubtitleIndex === -1) {
+            // 跳到第一项
+            if (this.sentenceMode && this.sentences.length > 0) {
+                this.jumpToItem(0, 'sentence');
+            } else if (this.subtitles.length > 0) {
+                this.jumpToSubtitle(0);
+            }
         }
     }
 

@@ -158,6 +158,23 @@ body {
     transform: none;
 }
 
+#sentenceModeBtn {
+    background: #2196F3;
+}
+
+#sentenceModeBtn:hover {
+    background: #1976D2;
+}
+
+#sentenceModeBtn.active {
+    background: #FF5722;
+    box-shadow: 0 0 10px rgba(255, 87, 34, 0.5);
+}
+
+#sentenceModeBtn.active:hover {
+    background: #E64A19;
+}
+
 .btn-small {
     background: #FF9800;
     color: white;
@@ -311,6 +328,40 @@ body {
 
 .subtitle-item.active .subtitle-text {
     font-weight: 500;
+}
+
+.subtitle-item.sentence {
+    border-left-color: #FF9800;
+    background: #fff3e0;
+    margin-left: 20px;
+    position: relative;
+}
+
+.subtitle-item.sentence::before {
+    content: "📝";
+    position: absolute;
+    left: -15px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: #FF9800;
+    color: white;
+    width: 25px;
+    height: 25px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.8em;
+}
+
+.subtitle-item.sentence:hover {
+    background: #ffe0b2;
+    border-left-color: #F57C00;
+}
+
+.subtitle-item.sentence.active {
+    background: linear-gradient(135deg, #FF9800, #F57C00);
+    border-left-color: #E65100;
 }
 
 .current-subtitle {
