@@ -22,44 +22,91 @@
 
 ## 🚀 快速开始
 
-### 1. 克隆仓库
-```bash
-git clone https://github.com/changshize/YT-ENGLISH.git
-cd YT-ENGLISH
-```
+### 方法1：一键启动（推荐）
 
-### 2. 启动AI字幕服务（可选）
-```bash
-# 安装Python依赖
-pip install flask flask-cors
+1. **克隆仓库**
+   ```bash
+   git clone https://github.com/changshize/english-learning-tools.git
+   cd english-learning-tools
+   ```
 
-# 启动Whisper服务器
-python mock_whisper_server.py
-```
+2. **启动AI服务器**
+   ```bash
+   # Windows: 双击运行启动脚本
+   start_real_whisper_isolated.bat
 
-### 3. 打开播放器
-直接在浏览器中打开 `index.html` 文件即可开始使用。
+   # 或命令行运行
+   .\start_real_whisper_isolated.bat
+   ```
 
-### 4. 开始使用
-1. 点击"📹 选择视频文件"加载本地视频
-2. 点击"🤖 AI生成字幕"自动生成字幕（需要后端服务）
-3. 或点击"📝 选择字幕文件"手动加载字幕
-4. 点击字幕进行跳转和影子跟读练习
+   **首次启动会自动：**
+   - ✅ 激活隔离的Python环境
+   - ✅ 检查Faster-Whisper安装
+   - ✅ 下载AI模型（约484MB，仅首次）
+   - ✅ 启动服务器在端口5000
+
+3. **验证服务器**
+   - 浏览器访问：http://localhost:5000/health
+   - 应显示：`{"status": "ok", "version": "faster_whisper"}`
+
+4. **打开播放器**
+   - 在浏览器中打开 `index.html` 文件
+
+### 方法2：手动启动
+
+1. **激活Python环境**
+   ```bash
+   # 激活预配置的隔离环境
+   whisper_isolated\Scripts\activate.bat
+   ```
+
+2. **启动AI服务器**
+   ```bash
+   # 运行Faster-Whisper服务器
+   python faster_whisper_server.py
+   ```
+
+3. **打开播放器**
+   - 在浏览器中打开 `index.html` 文件
+
+### 使用步骤
+
+1. **加载视频** 📹
+   - 点击"选择视频文件"按钮
+   - 支持MP4、WebM、AVI等格式
+
+2. **生成AI字幕** 🤖
+   - 点击"AI生成字幕"按钮
+   - 等待真实AI转录完成（通常1-3分钟）
+   - 字幕会自动显示在右侧列表
+
+3. **开始学习** 🎯
+   - 点击任意字幕跳转到对应时间
+   - 使用"重复"按钮进行影子跟读
+   - 调节播放速度适应学习节奏
+
+4. **快捷键操作** ⌨️
+   - `空格` - 播放/暂停
+   - `R` - 重复当前句子
+   - `←/→` - 上一句/下一句字幕
 
 ## 📁 项目结构
 
 ```
-YT-ENGLISH/
-├── index.html              # 🏠 主页面 - 播放器界面
-├── script.js               # ⚙️ 核心JavaScript逻辑
-├── style.css               # 🎨 样式文件 - 响应式设计
-├── mock_whisper_server.py  # 🐍 Python后端服务器
-├── requirements.txt        # 📦 Python依赖列表
-├── test-subtitle.vtt       # 📝 测试字幕文件
-├── README.md              # 📖 项目说明文档
-├── CHANGELOG.md           # 📋 版本更新日志
-├── LICENSE                # ⚖️ MIT开源许可证
-└── AI-SUBTITLE-GUIDE.md   # 🤖 AI字幕使用指南
+english-learning-tools/
+├── 📄 index.html                         # 主页面 - 视频播放器界面
+├── ⚙️ script.js                          # 前端JavaScript逻辑
+├── 🎨 style.css                          # 响应式样式设计
+├── 🤖 faster_whisper_server.py           # Faster-Whisper AI服务器
+├── 🚀 start_real_whisper_isolated.bat    # 一键启动脚本
+├── 📦 requirements.txt                   # Python依赖列表
+├── 📖 README.md                          # 项目说明文档
+├── 🚀 QUICK_START.md                     # 快速开始指南
+├── 📝 test-subtitle.vtt                  # 测试字幕文件
+└── 🐍 whisper_isolated/                  # 隔离的Python环境
+    ├── Scripts/                          # Python脚本
+    ├── Lib/                             # 依赖库
+    └── pyvenv.cfg                       # 环境配置
 ```
 
 ## 📋 使用说明
@@ -163,7 +210,81 @@ Whisper AI模型处理
 ### AI字幕功能要求
 - **Python**: 3.8 或更高版本
 - **内存**: 建议8GB以上 (用于Whisper模型)
-- **网络**: 首次使用需下载AI模型
+- **网络**: 首次使用需下载AI模型（约484MB）
+- **存储**: 至少1GB可用空间
+
+## 🔧 故障排除
+
+### 1. 服务器启动失败
+
+**问题**: 双击 `start_real_whisper_isolated.bat` 无反应
+```bash
+# 解决方案1: 检查Python环境
+python --version
+
+# 解决方案2: 重新创建隔离环境
+python -m venv whisper_isolated
+whisper_isolated\Scripts\activate.bat
+pip install flask flask-cors faster-whisper
+```
+
+**问题**: 提示"whisper_isolated环境不存在"
+```bash
+# 解决方案: 手动创建环境
+python -m venv whisper_isolated
+whisper_isolated\Scripts\activate.bat
+pip install -r requirements.txt
+```
+
+### 2. AI转录失败
+
+**问题**: 点击"AI生成字幕"后显示连接错误
+- ✅ 确保服务器正在运行（命令行窗口保持打开）
+- ✅ 访问 http://localhost:5000/health 检查服务状态
+- ✅ 检查防火墙是否阻止了5000端口
+
+**问题**: 转录过程中断或失败
+- ✅ 检查网络连接（首次需下载模型）
+- ✅ 确保视频文件格式正确（MP4/WebM/AVI）
+- ✅ 检查可用内存（建议8GB+）
+
+**问题**: 模型下载失败
+```bash
+# 解决方案: 手动下载模型
+python -c "from faster_whisper import WhisperModel; WhisperModel('small')"
+```
+
+### 3. 音频处理问题
+
+**问题**: 提示"音频提取失败"
+- ✅ 确保视频包含音频轨道
+- ✅ 尝试转换视频格式为MP4
+- ✅ 检查视频文件是否损坏
+
+**问题**: 转录结果为空
+- ✅ 确认视频中有清晰的英语语音
+- ✅ 检查音频音量是否过低
+- ✅ 尝试使用较短的视频片段测试
+
+### 4. 浏览器兼容性
+
+**问题**: 页面显示异常或功能不工作
+- ✅ 使用现代浏览器（Chrome/Firefox/Edge最新版）
+- ✅ 启用JavaScript
+- ✅ 清除浏览器缓存
+- ✅ 检查控制台错误信息
+
+### 5. 性能优化
+
+**慢速设备优化**:
+- 🔧 使用较小的视频文件（<100MB）
+- 🔧 关闭其他占用内存的程序
+- 🔧 考虑使用tiny模型（修改服务器代码）
+
+**网络优化**:
+- 🔧 首次使用选择网络较好的时间
+- 🔧 模型下载完成后可离线使用
+- 🔧 使用本地视频文件而非在线视频
 
 ## 🔧 开发说明
 
@@ -210,8 +331,8 @@ Whisper AI模型处理
 ### 开发环境
 ```bash
 # 克隆项目
-git clone https://github.com/changshize/YT-ENGLISH.git
-cd YT-ENGLISH
+git clone https://github.com/changshize/english-learning-tools.git
+cd english-learning-tools
 
 # 启动开发服务器
 python mock_whisper_server.py
@@ -231,8 +352,8 @@ python mock_whisper_server.py
 
 ## 📞 联系方式
 
-- **GitHub Issues**: [提交问题和建议](https://github.com/changshize/YT-ENGLISH/issues)
-- **项目主页**: [YT-ENGLISH](https://github.com/changshize/YT-ENGLISH)
+- **GitHub Issues**: [提交问题和建议](https://github.com/changshize/english-learning-tools/issues)
+- **项目主页**: [english-learning-tools](https://github.com/changshize/english-learning-tools)
 
 ---
 
