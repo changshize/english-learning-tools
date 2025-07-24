@@ -35,10 +35,7 @@
                             <input type="file" id="videoFile" accept="video/*">
                             📹 选择视频文件
                         </label>
-                        <label class="file-input">
-                            <input type="file" id="subtitleFile" accept=".vtt,.srt">
-                            📝 选择字幕文件
-                        </label>
+                        <input type="file" id="jsonSubtitleInput" accept=".json" style="display: none;">
                     </div>
 
                     <div class="speed-control">
@@ -56,6 +53,7 @@
                         <button class="btn" id="prevBtn" disabled>⏮️ 上一句</button>
                         <button class="btn" id="nextBtn" disabled>⏭️ 下一句</button>
                         <button class="btn" id="generateSubtitleBtn" style="background: #2196F3;">🤖 AI生成双语字幕</button>
+                        <button class="btn" id="importJsonBtn" style="background: #4CAF50;">📁 导入JSON字幕</button>
                     </div>
                 </div>
 

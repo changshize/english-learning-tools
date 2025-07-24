@@ -13,7 +13,7 @@ class VideoPlayer {
 
     initializeElements() {
         this.videoFile = document.getElementById('videoFile');
-        this.subtitleFile = document.getElementById('subtitleFile');
+        // 不再需要subtitleFile，因为我们使用JSON字幕导入
         this.subtitleList = document.getElementById('subtitleList');
         this.currentSubtitle = document.getElementById('currentSubtitle');
         this.progressBar = document.getElementById('progressBar');
@@ -32,6 +32,8 @@ class VideoPlayer {
         this.autoScrollBtn = document.getElementById('autoScrollBtn');
         this.clearHighlightBtn = document.getElementById('clearHighlightBtn');
         this.generateSubtitleBtn = document.getElementById('generateSubtitleBtn');
+        this.importJsonBtn = document.getElementById('importJsonBtn');
+        this.jsonSubtitleInput = document.getElementById('jsonSubtitleInput');
 
         // AI进度显示元素
         this.aiProgress = document.getElementById('aiProgress');
@@ -49,7 +51,7 @@ class VideoPlayer {
     bindEvents() {
         // 文件选择事件
         this.videoFile.addEventListener('change', (e) => this.loadVideo(e.target.files[0]));
-        this.subtitleFile.addEventListener('change', (e) => this.loadSubtitle(e.target.files[0]));
+        // 删除了subtitleFile的事件绑定，因为我们不再使用VTT/SRT字幕文件
 
         // 视频事件
         this.video.addEventListener('timeupdate', () => this.updateProgress());
@@ -63,6 +65,16 @@ class VideoPlayer {
         this.autoScrollBtn.addEventListener('click', () => this.toggleAutoScroll());
         this.clearHighlightBtn.addEventListener('click', () => this.clearHighlight());
         this.generateSubtitleBtn.addEventListener('click', () => this.generateSubtitlesWithAI());
+
+        if (this.importJsonBtn) {
+            this.importJsonBtn.addEventListener('click', () => this.importJsonSubtitles());
+        }
+
+        if (this.jsonSubtitleInput) {
+            this.jsonSubtitleInput.addEventListener('change', (e) => this.handleJsonSubtitleFile(e));
+        }
+
+
 
         // 浮动控制按钮事件
         this.floatRepeat.addEventListener('click', () => this.repeatCurrentSubtitle());
@@ -82,15 +94,119 @@ class VideoPlayer {
         document.addEventListener('keydown', (e) => this.handleKeyboard(e));
     }
 
-    loadVideo(file) {
+    async loadVideo(file) {
         if (file) {
             const url = URL.createObjectURL(file);
             this.video.src = url;
             this.videoInfo.textContent = `视频: ${file.name} (${this.formatFileSize(file.size)})`;
             this.fileInfo.style.display = 'block';
             this.floatingControls.style.display = 'flex';
+
+            // 尝试自动加载预处理的字幕
+            await this.tryLoadPreprocessedSubtitles(file);
+
             console.log('视频加载成功:', file.name);
         }
+    }
+
+    async tryLoadPreprocessedSubtitles(videoFile) {
+        try {
+            console.log('尝试加载预处理字幕...');
+
+            // 构建字幕文件路径 - 现在字幕文件与视频文件同名同目录
+            const videoName = videoFile.name.replace(/\.[^/.]+$/, ""); // 移除扩展名
+            const jsonFileName = `${videoName}.json`;
+
+            // 由于浏览器安全限制，无法直接访问本地文件系统
+            // 这里只是提示用户可以手动导入对应的JSON文件
+            console.log(`对应的字幕文件应该是: ${jsonFileName}`);
+            console.log('请使用"导入JSON字幕"按钮手动加载字幕文件');
+
+            return false;
+
+        } catch (error) {
+            console.error('检查预处理字幕失败:', error);
+            return false;
+        }
+    }
+
+    sanitizeFilename(filename) {
+        // 清理文件名，与Python脚本保持一致
+        return filename
+            .replace(/[<>:"/\\|?*]/g, '_')
+            .replace(/[：｜？]/g, '_')
+            .substring(0, 100);
+    }
+
+    // JSON字幕导入功能
+    importJsonSubtitles() {
+        if (this.jsonSubtitleInput) {
+            this.jsonSubtitleInput.click();
+        }
+    }
+
+    async handleJsonSubtitleFile(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+
+        console.log('开始处理JSON字幕文件:', file.name);
+
+        try {
+            // 读取JSON文件
+            const text = await this.readFileAsText(file);
+            const jsonData = JSON.parse(text);
+
+            // 验证JSON格式
+            if (!jsonData.subtitles || !Array.isArray(jsonData.subtitles)) {
+                throw new Error('JSON格式不正确：缺少subtitles数组');
+            }
+
+            // 验证字幕数据格式
+            const subtitles = jsonData.subtitles;
+            for (let i = 0; i < Math.min(subtitles.length, 3); i++) {
+                const sub = subtitles[i];
+                if (typeof sub.start !== 'number' || typeof sub.end !== 'number' || !sub.text) {
+                    throw new Error(`字幕格式不正确：第${i+1}条字幕缺少必要字段`);
+                }
+            }
+
+            // 加载字幕
+            this.subtitles = subtitles;
+            this.renderSubtitleList();
+            this.enableSubtitleControls();
+
+            // 显示信息
+            const videoInfo = jsonData.video_info || {};
+            const channelInfo = videoInfo.channel ? ` (${videoInfo.channel})` : '';
+            const processedTime = videoInfo.processed_at ?
+                ` - 处理时间: ${new Date(videoInfo.processed_at).toLocaleString()}` : '';
+
+            this.subtitleInfo.textContent =
+                `✅ 已导入JSON双语字幕: ${subtitles.length} 条${channelInfo}${processedTime}`;
+            this.fileInfo.style.display = 'block';
+
+            console.log('JSON字幕导入成功:', {
+                count: subtitles.length,
+                channel: videoInfo.channel,
+                filename: videoInfo.filename
+            });
+
+        } catch (error) {
+            console.error('JSON字幕导入失败:', error);
+            alert(`JSON字幕导入失败: ${error.message}`);
+        }
+
+        // 清空文件输入，允许重复选择同一文件
+        event.target.value = '';
+    }
+
+    readFileAsText(file) {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = (e) => resolve(e.target.result);
+            reader.onerror = (e) => reject(new Error('文件读取失败'));
+            reader.readAsText(file, 'utf-8');
+        });
     }
 
     loadSubtitle(file) {
@@ -755,6 +871,10 @@ class VideoPlayer {
 
 
     renderSubtitleList() {
+        if (!this.subtitleList || !this.subtitles || this.subtitles.length === 0) {
+            return;
+        }
+
         this.subtitleList.innerHTML = '';
 
         this.subtitles.forEach((subtitle, index) => {
