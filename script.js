@@ -32,8 +32,6 @@ class VideoPlayer {
         this.autoScrollBtn = document.getElementById('autoScrollBtn');
         this.clearHighlightBtn = document.getElementById('clearHighlightBtn');
         this.generateSubtitleBtn = document.getElementById('generateSubtitleBtn');
-        this.translateBtn = document.getElementById('translateBtn');
-        this.toggleBilingualBtn = document.getElementById('toggleBilingual');
 
         // AI进度显示元素
         this.aiProgress = document.getElementById('aiProgress');
@@ -65,8 +63,6 @@ class VideoPlayer {
         this.autoScrollBtn.addEventListener('click', () => this.toggleAutoScroll());
         this.clearHighlightBtn.addEventListener('click', () => this.clearHighlight());
         this.generateSubtitleBtn.addEventListener('click', () => this.generateSubtitlesWithAI());
-        this.translateBtn.addEventListener('click', () => this.translateSubtitles());
-        this.toggleBilingualBtn.addEventListener('click', () => this.toggleBilingualMode());
 
         // 浮动控制按钮事件
         this.floatRepeat.addEventListener('click', () => this.repeatCurrentSubtitle());
@@ -334,17 +330,21 @@ class VideoPlayer {
 
             // 转换为字幕格式
             this.subtitles = this.processWhisperAPIResult(result);
+
+            this.updateProgress('✅ 英文字幕生成完成，开始翻译...', 70);
+
+            // 自动翻译为双语字幕
+            const translatedSubtitles = await this.batchTranslateSubtitles(this.subtitles);
+            this.subtitles = translatedSubtitles;
+
             this.renderSubtitleList();
             this.enableSubtitleControls();
 
-            // 启用翻译按钮
-            this.translateBtn.disabled = false;
-
-            this.subtitleInfo.textContent = `Python Whisper生成字幕: ${this.subtitles.length} 条字幕`;
+            this.subtitleInfo.textContent = `AI生成双语字幕: ${this.subtitles.length} 条字幕`;
             this.fileInfo.style.display = 'block';
 
-            this.updateProgress('✅ Whisper字幕生成完成！', 100);
-            console.log('Python Whisper字幕生成完成:', this.subtitles.length, '条字幕');
+            this.updateProgress('✅ 双语字幕生成完成！', 100);
+            console.log('双语字幕生成完成:', this.subtitles.length, '条字幕');
 
             setTimeout(() => this.hideProgress(), 2000);
 
@@ -354,7 +354,7 @@ class VideoPlayer {
             setTimeout(() => this.hideProgress(), 5000);
         } finally {
             this.generateSubtitleBtn.disabled = false;
-            this.generateSubtitleBtn.textContent = '🤖 AI生成字幕';
+            this.generateSubtitleBtn.textContent = '🤖 AI生成双语字幕';
         }
     }
 
@@ -569,40 +569,7 @@ class VideoPlayer {
 
         return subtitles;
     }
-    // 翻译字幕功能
-    async translateSubtitles() {
-        if (!this.subtitles || this.subtitles.length === 0) {
-            alert('请先生成英文字幕');
-            return;
-        }
 
-        try {
-            this.showProgress('正在翻译字幕...', 10);
-            this.translateBtn.disabled = true;
-            this.translateBtn.textContent = '🌐 正在翻译...';
-
-            // 批量翻译字幕
-            const translatedSubtitles = await this.batchTranslateSubtitles(this.subtitles);
-
-            // 更新字幕数据
-            this.subtitles = translatedSubtitles;
-            this.renderSubtitleList();
-
-            // 启用双语模式按钮
-            this.toggleBilingualBtn.disabled = false;
-
-            this.updateProgress('✅ 翻译完成！', 100);
-            setTimeout(() => this.hideProgress(), 2000);
-
-        } catch (error) {
-            console.error('字幕翻译失败:', error);
-            this.updateProgress('❌ 翻译失败: ' + error.message, 0);
-            setTimeout(() => this.hideProgress(), 3000);
-        } finally {
-            this.translateBtn.disabled = false;
-            this.translateBtn.textContent = '🌐 生成中文翻译';
-        }
-    }
 
     // 批量翻译字幕（使用免费翻译API）
     async batchTranslateSubtitles(subtitles) {
@@ -769,19 +736,7 @@ class VideoPlayer {
         return `[中文] ${text}`;
     }
 
-    // 切换双语模式
-    toggleBilingualMode() {
-        const subtitleItems = document.querySelectorAll('.subtitle-item');
-        const isCurrentlyBilingual = this.toggleBilingualBtn.textContent.includes('关闭');
 
-        if (isCurrentlyBilingual) {
-            subtitleItems.forEach(item => item.classList.remove('bilingual'));
-            this.toggleBilingualBtn.textContent = '🌐 双语模式';
-        } else {
-            subtitleItems.forEach(item => item.classList.add('bilingual'));
-            this.toggleBilingualBtn.textContent = '🌐 关闭双语';
-        }
-    }
 
 
 
@@ -810,7 +765,6 @@ class VideoPlayer {
             // 构建双语字幕HTML
             const englishText = `<div class="english-text">${subtitle.text}</div>`;
             const chineseText = subtitle.chinese ? `<div class="chinese-text">${subtitle.chinese}</div>` : '';
-
 
 
             item.innerHTML = `
