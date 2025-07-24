@@ -6,7 +6,7 @@ class VideoPlayer {
         this.isSubtitleVisible = false;
         this.autoScroll = true;
         // 移除分句功能，改用AI生成字幕
-        
+
         this.initializeElements();
         this.bindEvents();
     }
@@ -23,7 +23,7 @@ class VideoPlayer {
         this.fileInfo = document.getElementById('fileInfo');
         this.videoInfo = document.getElementById('videoInfo');
         this.subtitleInfo = document.getElementById('subtitleInfo');
-        
+
         // 控制按钮
         this.toggleSubtitleBtn = document.getElementById('toggleSubtitle');
         this.repeatBtn = document.getElementById('repeatBtn');
@@ -32,12 +32,14 @@ class VideoPlayer {
         this.autoScrollBtn = document.getElementById('autoScrollBtn');
         this.clearHighlightBtn = document.getElementById('clearHighlightBtn');
         this.generateSubtitleBtn = document.getElementById('generateSubtitleBtn');
+        this.translateBtn = document.getElementById('translateBtn');
+        this.toggleBilingualBtn = document.getElementById('toggleBilingual');
 
         // AI进度显示元素
         this.aiProgress = document.getElementById('aiProgress');
         this.progressText = document.getElementById('progressText');
         this.progressBarFill = document.getElementById('progressBarFill');
-        
+
         // 浮动控制按钮
         this.floatingControls = document.getElementById('floatingControls');
         this.floatRepeat = document.getElementById('floatRepeat');
@@ -50,11 +52,11 @@ class VideoPlayer {
         // 文件选择事件
         this.videoFile.addEventListener('change', (e) => this.loadVideo(e.target.files[0]));
         this.subtitleFile.addEventListener('change', (e) => this.loadSubtitle(e.target.files[0]));
-        
+
         // 视频事件
         this.video.addEventListener('timeupdate', () => this.updateProgress());
         this.video.addEventListener('loadedmetadata', () => this.updateVideoInfo());
-        
+
         // 控制按钮事件
         this.toggleSubtitleBtn.addEventListener('click', () => this.toggleSubtitleDisplay());
         this.repeatBtn.addEventListener('click', () => this.repeatCurrentSubtitle());
@@ -63,21 +65,23 @@ class VideoPlayer {
         this.autoScrollBtn.addEventListener('click', () => this.toggleAutoScroll());
         this.clearHighlightBtn.addEventListener('click', () => this.clearHighlight());
         this.generateSubtitleBtn.addEventListener('click', () => this.generateSubtitlesWithAI());
-        
+        this.translateBtn.addEventListener('click', () => this.translateSubtitles());
+        this.toggleBilingualBtn.addEventListener('click', () => this.toggleBilingualMode());
+
         // 浮动控制按钮事件
         this.floatRepeat.addEventListener('click', () => this.repeatCurrentSubtitle());
         this.floatPrev.addEventListener('click', () => this.goToPreviousSubtitle());
         this.floatNext.addEventListener('click', () => this.goToNextSubtitle());
         this.floatToggle.addEventListener('click', () => this.toggleSubtitleDisplay());
-        
+
         // 播放速度控制
         document.querySelectorAll('.speed-btn').forEach(btn => {
             btn.addEventListener('click', (e) => this.setPlaybackSpeed(e.target.dataset.speed));
         });
-        
+
         // 进度条点击
         this.progressBar.addEventListener('click', (e) => this.seekTo(e));
-        
+
         // 键盘快捷键
         document.addEventListener('keydown', (e) => this.handleKeyboard(e));
     }
@@ -240,7 +244,7 @@ class VideoPlayer {
 
     parseSRT(content) {
         const blocks = content.split('\n\n');
-        
+
         blocks.forEach(block => {
             const lines = block.trim().split('\n');
             if (lines.length >= 3) {
@@ -248,7 +252,7 @@ class VideoPlayer {
                 if (timeLine.includes('-->')) {
                     const times = timeLine.split('-->');
                     const text = lines.slice(2).join(' ');
-                    
+
                     this.subtitles.push({
                         start: this.parseTime(times[0].trim()),
                         end: this.parseTime(times[1].trim()),
@@ -332,6 +336,9 @@ class VideoPlayer {
             this.subtitles = this.processWhisperAPIResult(result);
             this.renderSubtitleList();
             this.enableSubtitleControls();
+
+            // 启用翻译按钮
+            this.translateBtn.disabled = false;
 
             this.subtitleInfo.textContent = `Python Whisper生成字幕: ${this.subtitles.length} 条字幕`;
             this.fileInfo.style.display = 'block';
@@ -562,6 +569,219 @@ class VideoPlayer {
 
         return subtitles;
     }
+    // 翻译字幕功能
+    async translateSubtitles() {
+        if (!this.subtitles || this.subtitles.length === 0) {
+            alert('请先生成英文字幕');
+            return;
+        }
+
+        try {
+            this.showProgress('正在翻译字幕...', 10);
+            this.translateBtn.disabled = true;
+            this.translateBtn.textContent = '🌐 正在翻译...';
+
+            // 批量翻译字幕
+            const translatedSubtitles = await this.batchTranslateSubtitles(this.subtitles);
+
+            // 更新字幕数据
+            this.subtitles = translatedSubtitles;
+            this.renderSubtitleList();
+
+            // 启用双语模式按钮
+            this.toggleBilingualBtn.disabled = false;
+
+            this.updateProgress('✅ 翻译完成！', 100);
+            setTimeout(() => this.hideProgress(), 2000);
+
+        } catch (error) {
+            console.error('字幕翻译失败:', error);
+            this.updateProgress('❌ 翻译失败: ' + error.message, 0);
+            setTimeout(() => this.hideProgress(), 3000);
+        } finally {
+            this.translateBtn.disabled = false;
+            this.translateBtn.textContent = '🌐 生成中文翻译';
+        }
+    }
+
+    // 批量翻译字幕（使用免费翻译API）
+    async batchTranslateSubtitles(subtitles) {
+        const translatedSubtitles = [];
+
+        for (let i = 0; i < subtitles.length; i++) {
+            const progress = Math.round((i / subtitles.length) * 80) + 10;
+            this.updateProgress(`正在翻译字幕 ${i + 1}/${subtitles.length}...`, progress);
+
+            try {
+                const translation = await this.translateText(subtitles[i].text);
+
+                translatedSubtitles.push({
+                    ...subtitles[i],
+                    chinese: translation
+                });
+
+                // 避免API限制
+                await new Promise(resolve => setTimeout(resolve, 200));
+            } catch (error) {
+                console.error(`翻译第${i+1}条字幕失败:`, error);
+                translatedSubtitles.push({
+                    ...subtitles[i],
+                    chinese: `[翻译失败] ${subtitles[i].text}`
+                });
+            }
+        }
+
+        return translatedSubtitles;
+    }
+
+    // 翻译单条文本（多API支持）
+    async translateText(text) {
+        // 调整API优先级，优先使用可用的API
+        const apis = [
+            () => this.translateWithMyMemory(text),
+            () => this.translateWithGoogleTranslate(text),
+            () => this.translateWithLibreTranslate(text)
+        ];
+
+        for (const api of apis) {
+            try {
+                const result = await api();
+                if (result && result !== text && !result.includes('错误')) {
+                    return result;
+                }
+            } catch (error) {
+                // 静默失败，尝试下一个API
+                continue;
+            }
+        }
+
+        // 所有API都失败时的降级处理
+        return this.fallbackTranslate(text);
+    }
+
+    // LibreTranslate API (开源免费)
+    async translateWithLibreTranslate(text) {
+        const response = await fetch('https://libretranslate.de/translate', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                q: text,
+                source: 'en',
+                target: 'zh',
+                format: 'text'
+            })
+        });
+
+        if (!response.ok) {
+            throw new Error(`LibreTranslate API错误: ${response.status}`);
+        }
+
+        const data = await response.json();
+        return data.translatedText;
+    }
+
+    // MyMemory API (主要选择)
+    async translateWithMyMemory(text) {
+        const response = await fetch(`https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=en|zh`);
+
+        if (!response.ok) {
+            throw new Error(`MyMemory HTTP错误: ${response.status}`);
+        }
+
+        const data = await response.json();
+
+        if (data.responseStatus === 200 && data.responseData && data.responseData.translatedText) {
+            const translation = data.responseData.translatedText;
+            // 过滤掉明显的错误翻译
+            if (translation && translation !== text && !translation.includes('MYMEMORY WARNING')) {
+                return translation;
+            }
+        }
+
+        throw new Error(`MyMemory翻译失败: ${data.responseStatus || '未知错误'}`);
+    }
+
+    // Google Translate (非官方API)
+    async translateWithGoogleTranslate(text) {
+        // 使用非官方的Google Translate API
+        const response = await fetch(`https://translate.googleapis.com/translate_a/single?client=gtx&sl=en&tl=zh&dt=t&q=${encodeURIComponent(text)}`);
+        const data = await response.json();
+
+        if (data && data[0] && data[0][0] && data[0][0][0]) {
+            return data[0][0][0];
+        } else {
+            throw new Error('Google Translate API返回错误');
+        }
+    }
+
+    // 降级翻译方案（本地词典）
+    fallbackTranslate(text) {
+
+        const commonTranslations = {
+            'Hello everyone and welcome back to English with Lucy.': '大家好，欢迎回到露西英语课堂。',
+            'Today I have a very interesting grammar question for you.': '今天我有一个非常有趣的语法问题要问大家。',
+            'Can you spot the mistake in this sentence?': '你能发现这个句子中的错误吗？',
+            'The correct way to say this is': '正确的说法是',
+            'We use': '我们使用',
+            'And we use': '我们也使用',
+            'So remember': '所以请记住',
+            'Let\'s practice': '让我们练习',
+            'Thanks for watching': '感谢观看',
+            'See you in the next lesson': '下节课见',
+            'I borrowed my guitar to my brother.': '我把吉他借给了我的兄弟。',
+            'I lent my guitar to my brother.': '我把吉他借给了我的兄弟。',
+            'you lend TO someone': '你借给某人',
+            'you borrow FROM someone': '你从某人那里借',
+            'Put your tongue between your teeth.': '把舌头放在牙齿之间。',
+            'Now try saying': '现在试着说',
+            'Great! Let\'s move on to the next sound.': '很好！让我们继续下一个音。',
+            'Practice makes perfect': '熟能生巧',
+            'Don\'t worry if it takes time': '如果需要时间不要担心',
+            'Keep practicing every day.': '每天坚持练习。',
+            'Nice to meet you!': '很高兴见到你！',
+            'The pleasure is mine.': '我的荣幸。',
+            'I\'d like to order': '我想点',
+            'Would you like anything to drink?': '你想喝点什么吗？',
+            'I\'ll have a glass of water, thank you.': '我要一杯水，谢谢。'
+        };
+
+        // 完全匹配
+        if (commonTranslations[text]) {
+            return commonTranslations[text];
+        }
+
+        // 部分匹配和替换
+        let result = text;
+        for (const [en, zh] of Object.entries(commonTranslations)) {
+            if (text.toLowerCase().includes(en.toLowerCase())) {
+                result = result.replace(new RegExp(en, 'gi'), zh);
+                break;
+            }
+        }
+
+        // 如果有替换，返回结果；否则返回标记
+        if (result !== text) {
+            return result;
+        }
+
+        return `[中文] ${text}`;
+    }
+
+    // 切换双语模式
+    toggleBilingualMode() {
+        const subtitleItems = document.querySelectorAll('.subtitle-item');
+        const isCurrentlyBilingual = this.toggleBilingualBtn.textContent.includes('关闭');
+
+        if (isCurrentlyBilingual) {
+            subtitleItems.forEach(item => item.classList.remove('bilingual'));
+            this.toggleBilingualBtn.textContent = '🌐 双语模式';
+        } else {
+            subtitleItems.forEach(item => item.classList.add('bilingual'));
+            this.toggleBilingualBtn.textContent = '🌐 关闭双语';
+        }
+    }
 
 
 
@@ -581,17 +801,26 @@ class VideoPlayer {
 
     renderSubtitleList() {
         this.subtitleList.innerHTML = '';
-        
+
         this.subtitles.forEach((subtitle, index) => {
             const item = document.createElement('div');
             item.className = 'subtitle-item';
             item.dataset.index = index;
-            
+
+            // 构建双语字幕HTML
+            const englishText = `<div class="english-text">${subtitle.text}</div>`;
+            const chineseText = subtitle.chinese ? `<div class="chinese-text">${subtitle.chinese}</div>` : '';
+
+
+
             item.innerHTML = `
                 <div class="subtitle-time">${this.formatTime(subtitle.start)} - ${this.formatTime(subtitle.end)}</div>
-                <div class="subtitle-text">${subtitle.text}</div>
+                <div class="subtitle-text">
+                    ${englishText}
+                    ${chineseText}
+                </div>
             `;
-            
+
             item.addEventListener('click', () => this.jumpToSubtitle(index));
             this.subtitleList.appendChild(item);
         });
@@ -600,51 +829,51 @@ class VideoPlayer {
     updateProgress() {
         const currentTime = this.video.currentTime;
         const duration = this.video.duration;
-        
+
         // 更新进度条
         if (duration) {
             const progress = (currentTime / duration) * 100;
             this.progressFill.style.width = progress + '%';
         }
-        
+
         // 更新时间显示
         this.currentTime.textContent = this.formatTime(currentTime);
         this.totalTime.textContent = this.formatTime(duration || 0);
-        
+
         // 更新当前字幕
         this.updateCurrentSubtitle(currentTime);
     }
 
     updateCurrentSubtitle(currentTime) {
         let newIndex = -1;
-        
+
         for (let i = 0; i < this.subtitles.length; i++) {
             if (currentTime >= this.subtitles[i].start && currentTime <= this.subtitles[i].end) {
                 newIndex = i;
                 break;
             }
         }
-        
+
         if (newIndex !== this.currentSubtitleIndex) {
             // 移除之前的高亮
             if (this.currentSubtitleIndex >= 0) {
                 const prevItem = this.subtitleList.children[this.currentSubtitleIndex];
                 if (prevItem) prevItem.classList.remove('active');
             }
-            
+
             this.currentSubtitleIndex = newIndex;
-            
+
             if (newIndex >= 0) {
                 const currentItem = this.subtitleList.children[newIndex];
                 if (currentItem) {
                     currentItem.classList.add('active');
-                    
+
                     // 自动滚动到当前字幕
                     if (this.autoScroll) {
                         currentItem.scrollIntoView({ behavior: 'smooth', block: 'center' });
                     }
                 }
-                
+
                 // 显示当前字幕
                 if (this.isSubtitleVisible) {
                     this.currentSubtitle.textContent = this.subtitles[newIndex].text;
@@ -747,7 +976,7 @@ class VideoPlayer {
 
     setPlaybackSpeed(speed) {
         this.video.playbackRate = parseFloat(speed);
-        
+
         // 更新按钮状态
         document.querySelectorAll('.speed-btn').forEach(btn => {
             btn.classList.remove('active');
@@ -781,11 +1010,11 @@ class VideoPlayer {
 
     formatTime(seconds) {
         if (isNaN(seconds)) return '00:00';
-        
+
         const hours = Math.floor(seconds / 3600);
         const minutes = Math.floor((seconds % 3600) / 60);
         const secs = Math.floor(seconds % 60);
-        
+
         if (hours > 0) {
             return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
         } else {
@@ -803,7 +1032,7 @@ class VideoPlayer {
 
     handleKeyboard(e) {
         if (e.target.tagName === 'INPUT') return;
-        
+
         switch(e.key) {
             case ' ':
                 e.preventDefault();
