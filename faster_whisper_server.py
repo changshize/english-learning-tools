@@ -126,14 +126,25 @@ def transcribe_audio():
         return jsonify({'error': f'Server error: {str(e)}'}), 500
 
 if __name__ == '__main__':
-    print("🚀 Faster-Whisper AI Server")
+    import sys
+
+    # 支持端口参数
+    port = 5000
+    if len(sys.argv) > 1:
+        try:
+            port = int(sys.argv[1])
+        except ValueError:
+            print("❌ Invalid port number")
+            exit(1)
+
+    print(f"🚀 Faster-Whisper AI Server (Port: {port})")
     print("=" * 50)
-    
+
     if not FASTER_WHISPER_AVAILABLE:
         print("❌ faster-whisper not installed")
         print("Please run: pip install faster-whisper")
         exit(1)
-    
+
     # 启动时加载默认模型
     print("Loading Faster-Whisper model...")
     if load_faster_whisper_model("small"):
@@ -141,15 +152,15 @@ if __name__ == '__main__':
     else:
         print("❌ Failed to load Faster-Whisper model")
         exit(1)
-    
+
     print("🚀 Starting server...")
-    print("📡 API URL: http://localhost:5000")
+    print(f"📡 API URL: http://localhost:{port}")
     print("=" * 50)
-    
+
     # 启动Flask服务器
     app.run(
         host='0.0.0.0',
-        port=5000,
+        port=port,
         debug=False,
         threaded=True
     )

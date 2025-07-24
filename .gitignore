@@ -27,6 +27,8 @@ venv/
 env/
 ENV/
 .venv/
+whisper_isolated/
+whisper_clean/
 
 # IDE文件
 .vscode/
@@ -40,6 +42,7 @@ Thumbs.db
 # 项目特定文件
 youtube-downloader/cookies.txt    # 不要上传个人cookies
 youtube-downloader/downloads/     # 不要上传下载的视频文件
+subtitles/                        # 不要上传生成的字幕文件
 *.mp4
 *.webm
 *.mkv
@@ -47,6 +50,7 @@ youtube-downloader/downloads/     # 不要上传下载的视频文件
 *.mov
 *.vtt
 *.srt
+*.json
 
 # 日志文件
 *.log

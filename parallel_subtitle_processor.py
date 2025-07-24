@@ -16,6 +16,7 @@ import logging
 from concurrent.futures import ThreadPoolExecutor
 import queue
 import threading
+import hashlib
 
 # 配置日志
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -26,7 +27,19 @@ class ParallelSubtitleProcessor:
         self.downloads_path = Path(downloads_path)
         # output_path现在不再使用，因为字幕文件直接保存在视频同目录
         self.output_path = None
-        self.whisper_api_url = "http://localhost:5000"
+
+        # 多个Whisper服务器URL (支持4-8个服务器)
+        self.whisper_servers = [
+            "http://localhost:5000",
+            "http://localhost:5001",
+            "http://localhost:5002",
+            "http://localhost:5003",
+            "http://localhost:5004",
+            "http://localhost:5005",
+            "http://localhost:5006",
+            "http://localhost:5007"
+        ]
+        self.current_server_index = 0
         
         # 并发控制
         self.max_transcribe_workers = max_transcribe_workers  # 转录并发数
@@ -57,10 +70,8 @@ class ParallelSubtitleProcessor:
                 
                 for file_path in channel_dir.iterdir():
                     if file_path.suffix.lower() in video_extensions:
-                        # 检查是否已有处理过的字幕文件
-                        subtitle_file = self.get_subtitle_path(file_path)
-                        
-                        if not subtitle_file.exists():
+                        # 使用哈希值检查是否已处理过（更准确的查重）
+                        if not self.is_video_processed(file_path):
                             video_files.append({
                                 'path': file_path,
                                 'channel': channel_dir.name,
@@ -68,7 +79,6 @@ class ParallelSubtitleProcessor:
                                 'size_mb': file_path.stat().st_size / (1024 * 1024)
                             })
                         else:
-                            logger.info(f"⏭️  跳过已处理: {file_path.name}")
                             self.skipped_count += 1
         
         return video_files
@@ -77,23 +87,121 @@ class ParallelSubtitleProcessor:
         """获取字幕文件路径 - 保存在视频同目录，文件名相同"""
         # 直接保存在视频文件的同一目录，文件名与视频相同
         return video_path.parent / f"{video_path.stem}.json"
+
+    def get_video_hash(self, video_path, sample_size=1024*1024):
+        """计算视频文件哈希值（用于查重）"""
+        try:
+            hash_md5 = hashlib.md5()
+
+            # 只读取文件的开头、中间、结尾部分来计算哈希，提高速度
+            file_size = video_path.stat().st_size
+
+            with open(video_path, 'rb') as f:
+                # 读取开头
+                hash_md5.update(f.read(sample_size))
+
+                # 读取中间
+                if file_size > sample_size * 3:
+                    f.seek(file_size // 2)
+                    hash_md5.update(f.read(sample_size))
+
+                # 读取结尾
+                if file_size > sample_size * 2:
+                    f.seek(max(0, file_size - sample_size))
+                    hash_md5.update(f.read(sample_size))
+
+            # 加入文件大小和修改时间
+            hash_md5.update(str(file_size).encode())
+            hash_md5.update(str(video_path.stat().st_mtime).encode())
+
+            return hash_md5.hexdigest()
+        except Exception as e:
+            logger.error(f"计算视频哈希失败: {e}")
+            return None
+
+    def is_video_processed(self, video_path):
+        """检查视频是否已经处理过（基于哈希值查重）"""
+        subtitle_path = self.get_subtitle_path(video_path)
+
+        # 如果字幕文件不存在，肯定没处理过
+        if not subtitle_path.exists():
+            return False
+
+        try:
+            # 读取现有字幕文件
+            with open(subtitle_path, 'r', encoding='utf-8') as f:
+                subtitle_data = json.load(f)
+
+            # 检查是否有视频哈希信息
+            stored_hash = subtitle_data.get('video_info', {}).get('video_hash')
+            if not stored_hash:
+                logger.info(f"字幕文件缺少哈希信息，重新处理: {video_path.name}")
+                return False
+
+            # 计算当前视频的哈希
+            current_hash = self.get_video_hash(video_path)
+            if not current_hash:
+                return False
+
+            # 比较哈希值
+            if stored_hash == current_hash:
+                logger.info(f"✅ 视频未变化，跳过处理: {video_path.name}")
+                return True
+            else:
+                logger.info(f"🔄 视频已更新，重新处理: {video_path.name}")
+                return False
+
+        except Exception as e:
+            logger.error(f"检查视频处理状态失败: {e}")
+            return False
+
+    def get_next_whisper_server(self):
+        """轮询获取下一个Whisper服务器"""
+        server = self.whisper_servers[self.current_server_index]
+        self.current_server_index = (self.current_server_index + 1) % len(self.whisper_servers)
+        return server
+
+    def get_next_whisper_server(self):
+        """轮询获取下一个可用的Whisper服务器"""
+        server = self.whisper_servers[self.current_server_index]
+        self.current_server_index = (self.current_server_index + 1) % len(self.whisper_servers)
+        return server
+
+    async def get_available_whisper_server(self, session):
+        """获取可用的Whisper服务器，优先选择负载较低的"""
+        # 简单轮询策略，后续可以改进为负载检测
+        return self.get_next_whisper_server()
     
 
     
-    async def check_whisper_service(self):
-        """检查Whisper服务是否可用"""
-        try:
-            async with aiohttp.ClientSession() as session:
-                async with session.get(f"{self.whisper_api_url}/health") as response:
-                    if response.status == 200:
-                        data = await response.json()
-                        logger.info(f"✅ Whisper服务正常: {data.get('version', 'unknown')}")
-                        return True
-        except Exception as e:
-            logger.error(f"❌ Whisper服务不可用: {e}")
+    async def check_whisper_services(self):
+        """检查所有Whisper服务是否可用"""
+        available_servers = []
+
+        async with aiohttp.ClientSession() as session:
+            for server_url in self.whisper_servers:
+                try:
+                    async with session.get(f"{server_url}/health") as response:
+                        if response.status == 200:
+                            data = await response.json()
+                            if data.get('model_loaded'):
+                                available_servers.append(server_url)
+                                logger.info(f"✅ Whisper服务正常: {server_url}")
+                            else:
+                                logger.warning(f"⚠️ 模型未加载: {server_url}")
+                        else:
+                            logger.warning(f"⚠️ 服务器响应异常: {server_url}")
+                except Exception as e:
+                    logger.warning(f"⚠️ 无法连接服务器: {server_url} - {e}")
+
+        if available_servers:
+            # 只使用可用的服务器
+            self.whisper_servers = available_servers
+            logger.info(f"✅ 发现 {len(available_servers)} 个可用的Whisper服务器")
+            return True
+        else:
+            logger.error("❌ 没有可用的Whisper服务器")
             return False
-        
-        return False
     
     async def transcribe_worker(self, worker_id):
         """转录工作线程"""
@@ -195,26 +303,30 @@ class ParallelSubtitleProcessor:
         """转录单个视频"""
         try:
             video_path = video_info['path']
-            
+
+            # 获取可用的服务器
+            server_url = self.get_next_whisper_server()
+            logger.info(f"使用服务器: {server_url}")
+
             # 读取视频文件
             with open(video_path, 'rb') as f:
                 video_data = f.read()
-            
+
             # 准备表单数据
             data = aiohttp.FormData()
             data.add_field('audio', video_data, filename=video_path.name, content_type='video/mp4')
             data.add_field('language', 'en')
-            
+
             # 调用API
-            async with session.post(f"{self.whisper_api_url}/transcribe", data=data) as response:
+            async with session.post(f"{server_url}/transcribe", data=data) as response:
                 if response.status == 200:
                     result = await response.json()
                     if result.get('success'):
                         return result['result']['segments']
-                
-                logger.error(f"转录API返回错误: {response.status}")
+
+                logger.error(f"转录API返回错误: {response.status} from {server_url}")
                 return None
-                
+
         except Exception as e:
             logger.error(f"转录失败: {e}")
             return None
@@ -272,13 +384,19 @@ class ParallelSubtitleProcessor:
         try:
             subtitle_path = self.get_subtitle_path(video_info['path'])
             # 不需要创建目录，因为保存在视频同目录
-            
+
+            # 计算视频哈希值用于查重
+            video_hash = self.get_video_hash(video_info['path'])
+
             subtitle_data = {
                 'video_info': {
                     'filename': video_info['path'].name,
                     'channel': video_info['channel'],
                     'processed_at': datetime.now().isoformat(),
-                    'duration': self.calculate_duration(bilingual_subtitles)
+                    'duration': self.calculate_duration(bilingual_subtitles),
+                    'video_hash': video_hash,  # 添加视频哈希用于查重
+                    'file_size': video_info['path'].stat().st_size,
+                    'file_mtime': video_info['path'].stat().st_mtime
                 },
                 'subtitles': bilingual_subtitles
             }
@@ -304,8 +422,9 @@ class ParallelSubtitleProcessor:
         logger.info("=" * 50)
         
         # 检查Whisper服务
-        if not await self.check_whisper_service():
+        if not await self.check_whisper_services():
             logger.error("❌ 请先启动Whisper服务器")
+            logger.info("💡 运行: start_all_whisper_servers.bat")
             return
         
         # 扫描视频文件
@@ -387,8 +506,8 @@ if __name__ == "__main__":
     processor = ParallelSubtitleProcessor(
         downloads_path,
         None,  # output_path不再使用
-        max_transcribe_workers=2,  # 转录并发数：2个视频同时转录（避免资源竞争）
-        max_translate_workers=4    # 翻译并发数：4个翻译任务同时进行（平衡效率）
+        max_transcribe_workers=8,  # 转录并发数：8个视频同时转录（匹配8个服务器）
+        max_translate_workers=10   # 翻译并发数：10个翻译任务同时进行（更高效率）
     )
     
     # 运行处理
